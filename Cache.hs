@@ -1,35 +1,49 @@
 module Cache (makeCache) where
 
 import Data.Bits (xor)
-import Data.ByteString (empty, head, zipWith, pack)
+import Data.ByteString (ByteString, head, zipWith, pack)
+import Data.List (genericTake)
 
-import Prelude hiding (length, head, zipWith, (!!))
+import Prelude hiding (head, zipWith)
+import qualified Data.List as List (head, zipWith, zipWith3)
   
 import RAM
 import Types
 import Util
 
-import Debug.Trace
-
 makeCache :: Integer -> Cache
-makeCache when = iterate eRMH (cacheInit when) !!! rounds Cache
+makeCache when =
+  unpackCacheB $ iterate (eRMH when) (cacheInit when) !!! rounds Cache
 
-cacheInit :: Integer -> Cache
-cacheInit when = RAM { values = f, length = itemsAt Cache when, width = 64 }
+cacheInit :: Integer -> CacheB
+cacheInit when = asCache when $ tail $ iterate (hashS Cache) init
   where
-    f i
-      | i == -1    = iterate (hash PoW) empty !!! epochs when
-      | otherwise = hash Cache $ f (i - 1)
+    init =
+      let zero = pack $ genericTake (bytesInItem PoW) [0,0..]
+      in  iterate (hashS PoW) zero !!! (epochs when + 1)
 
-eRMH :: Cache -> Cache
-eRMH cache = eRMHit 0 cache 
+eRMH :: Integer -> CacheB -> CacheB
+eRMH when cache0 = asCache when cache
+  where
+    cache = minorL ++ List.zipWith (eRMHit (minorR !)) cacheLtPrev cacheLt
+    minorR = eRMHminor (last cacheL : cacheLh)
+    minorL = elems minorR
+    cacheLtPrev = last (minorL) : cacheLt
+    (cacheLh, cacheLt) = splitAt (2^8) cacheL
+    cacheL = elems cache0
 
-eRMHit :: Integer -> Cache -> Cache
-eRMHit i cache
-  | length cache == i = cache
-  | otherwise =
-    let item1 = cache RAM.!! (i - 1)
-        item2 = cache RAM.!! (fromIntegral $ head $ cache RAM.!! i)
-        val = hash Cache $ pack $ zipWith xor item1 item2
-    in eRMHit (i + 1) $ replaceAtBy cache i val
+eRMHminor :: [ByteString] -> RAM ByteString
+eRMHminor cacheLprev = minor
+  where
+    minor = asCacheMinor $ List.zipWith3 eRMHit' [0..] cacheLprev cacheL
+    eRMHit' = eRMHit . getter
+    getter n i
+      | i < n = minor ! i
+      | otherwise = cacheR ! i
+    cacheL = tail cacheLprev
+    cacheR = asCacheMinor cacheL
 
+eRMHit :: (Integer -> ByteString) -> ByteString -> ByteString -> ByteString
+eRMHit getter prev curr =
+  hashS Cache $ pack $ zipWith xor prev item
+  where item = getter (fromIntegral $ head curr)

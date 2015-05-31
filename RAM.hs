@@ -1,22 +1,24 @@
 module RAM (
-  RAM(..), (!!)
+  RAM, asRAM, (!), (//), len, Array.elems, Array.amap
   ) where
 
-import Control.Monad
-import Data.Binary
-import Prelude hiding (length, (!!))
+import qualified Data.Array.IArray as Array
+import Data.List (genericTake)
 
--- length is number of items, width is number of bytes in each item
-data RAM a = RAM { values :: Integer -> a, length :: Integer, width :: Int }
+type RAM = Array.Array Integer
 
-(!!) :: RAM a -> Integer -> a
-(!!) ram = values ram . (`mod` length ram)
+asRAM :: Integer -> [a] -> RAM a
+asRAM len ls = Array.listArray (0, len - 1) $ genericTake len ls
 
--- instance (Binary a) => Binary (RAM a) where
---   put (RAM { values = f, length = n, width = w }) = do
---     put w
---     forM_ [0..n-1] (put . f)
+len :: RAM a -> Integer
+len ram = 1 + snd (Array.bounds ram)
 
---   get = do
---     w <- get
-    
+safeIndex :: RAM a -> Integer -> Integer
+safeIndex ram i = (i + l) `rem` l
+  where l = len ram
+
+(!) :: RAM a -> Integer -> a
+ram ! i = ram Array.! safeIndex ram i
+
+(//) :: RAM a -> [(Integer, a)] -> RAM a
+ram // [(i, e)] = ram Array.// [(safeIndex ram i, e)]

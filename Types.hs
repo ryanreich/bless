@@ -1,17 +1,26 @@
 module Types (
-  EthWord, Cache, Dataset, PoWStage(..),
-  rounds, roomItems, roomsAt, itemsAt, epochs, hash
+  EthWord, CacheWord, CacheB, CacheMinor, Cache, Dataset, PoWStage(..),
+  rounds, epochs,
+  bytesInItem, wordsInItem,
+  roomItems, roomsAt, itemsAt,
+  hash, hashS
   ) where
 
+import Blockchain.ExtWord (Word512)
 import qualified Crypto.Hash.SHA3 as SHA3
-import Data.ByteString
+import Data.ByteString.Lazy (ByteString, fromStrict)
+import qualified Data.ByteString as Strict
 import Data.Word
 import Math.NumberTheory.Primes.Testing (isPrime)
 
 import RAM
 
 type EthWord = Word32 -- jWordBytes = 4
-type Cache = RAM ByteString
+type CacheWord = Word512 -- bytesInItem Cache = 64 -> 512 bits
+
+type CacheB = RAM Strict.ByteString
+type CacheMinor = RAM Strict.ByteString
+type Cache = RAM [EthWord]
 type Dataset = RAM [EthWord]
 
 data PoWStage = Cache | Dataset | Mix | PoW
@@ -40,6 +49,10 @@ bytesInItem stage = case stage of
     in jMixBytes
   PoW -> 32
 
+wordsInItem :: PoWStage -> Integer
+wordsInItem stage =
+  let jWordBytes = 4
+  in bytesInItem stage `quot` jWordBytes
 
 roomsInitial :: PoWStage -> Integer
 roomsInitial stage = case stage of
@@ -90,5 +103,10 @@ epochs when = when `quot` jEpochBlocks
   where jEpochBlocks = 30000
 
 hash :: PoWStage -> ByteString -> ByteString
-hash Mix = SHA3.hash 256
-hash _   = SHA3.hash 512
+hash Mix = fromStrict . SHA3.hashlazy 256
+hash _   = fromStrict . SHA3.hashlazy 512
+
+hashS :: PoWStage -> Strict.ByteString -> Strict.ByteString
+hashS Mix = SHA3.hash 256
+hashS _   = SHA3.hash 512
+

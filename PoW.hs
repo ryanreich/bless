@@ -1,6 +1,7 @@
 module PoW where
 
-import Data.ByteString (ByteString, append, reverse)
+import Data.Binary
+import Data.ByteString.Lazy (ByteString, append, reverse)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 
@@ -22,5 +23,5 @@ minePoW header dataset difficulty =
       let headHash = hash PoW $ header
                      -- rlpSerialize, getResHead undefined
                      --fromStrict $ hash PoW $ rlpSerialize (getResHead header)
-          nonceHash = reverse $ hash PoW $ encodeS nonce
-      in decodeS $ hash PoW $ snd $ onePoW dataset $ append headHash nonceHash
+          nonceHash = reverse $ hash PoW $ encode nonce
+      in decode $ hash PoW $ snd $ onePoW dataset $ append headHash nonceHash
