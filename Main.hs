@@ -5,9 +5,8 @@ import Util
 import Types
 import RAM
 
-import Network.Haskoin.Crypto (Word512)
+import Data.Binary
 
-import qualified Data.Array as Array
 -- main = print $ minePoW header dataset difficulty
 --   where
 --     difficulty = 131072
@@ -15,5 +14,8 @@ import qualified Data.Array as Array
 --     dataset = makeDataset cache 0
 --     cache = makeCache 0
 
-main = print $ elems $ makeDataset cache 0
-  where cache = makeCache 0
+writeCache = encodeFile "cache" $ makeCache 0
+
+main = do
+  cache <- decodeFile "cache"
+  encodeFile "dataset" $ makeDataset cache 0

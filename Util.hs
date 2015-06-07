@@ -1,17 +1,20 @@
 module Util where
 
 import Data.Binary as Binary (Binary, encode, decode)
+import Data.Binary.Get
 import Data.Bits (FiniteBits(..), xor)
 import Data.Bool (bool)
 import Data.ByteString.Builder
-import Data.ByteString.Lazy (ByteString, pack, unpack, concat, empty, fromStrict)
+import Data.ByteString.Lazy (ByteString, pack, unpack, concat, empty, length,
+                             fromStrict)
 import qualified Data.ByteString as Strict (ByteString)
 import Data.Function (on)
 import Data.Lens.Common
 import Data.List (genericIndex)
+import Data.List.Split (chunksOf)
 import Data.Monoid
 
-import Prelude hiding (concat)
+import Prelude hiding (concat, length)
 
 import RAM
 import Types
@@ -20,9 +23,6 @@ import Debug.Trace
 
 asCache :: Integer -> [a] -> RAM a
 asCache when = asRAM (itemsAt Cache when)
-
-asCacheMinor :: [Strict.ByteString] -> CacheMinor
-asCacheMinor = asRAM (2^8)
 
 asDataset :: Integer -> [[EthWord]] -> Dataset
 asDataset when = asRAM (roomsAt Dataset when)
@@ -40,14 +40,13 @@ odds (w0:w1:ws) = w1:odds ws
 odds _ = []
 
 asGroupsOf :: Int -> [a] -> [[a]]
-asGroupsOf n xs = take (length xs `quot` n) $ takeGroups $ dropGroups xs
-  where takeGroups = map (take n)
-        dropGroups = iterate (drop n)
+asGroupsOf = chunksOf
 
 unpackWords :: ByteString -> [EthWord]
-unpackWords = map (decode . pack) . asGroupsOf jWordBytes . unpack
-  where jWordBytes = 4 -- EthWord = Word32
-
+unpackWords bs = runGet (sequence $ replicate n getWord32be) bs
+  where
+    n = fromIntegral $ length bs `quot` 4
+  
 packWords :: [EthWord] -> ByteString
 packWords = toLazyByteString . foldr (mappend . word32BE) (lazyByteString empty)
 
