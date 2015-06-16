@@ -1,4 +1,5 @@
 --import PoW
+import Dataset.Types
 import Dataset
 import Cache
 import Util
@@ -14,8 +15,7 @@ import Data.Binary
 --     dataset = makeDataset cache 0
 --     cache = makeCache 0
 
-writeCache = encodeFile "cache" $ makeCache 0
-
 main = do
   cache <- decodeFile "cache"
-  encodeFile "dataset" $ makeDataset cache 0
+  print $ invoke makeDataset cache 0 !0
+  --encodeFile "dataset" $ makeDataset cache 0

@@ -1,12 +1,11 @@
 module Types (
-  EthWord, CacheWord, CacheB, CacheMinor, Cache, Dataset, PoWStage(..),
+  EthWord, CacheB, CacheMinor, Cache, Dataset, PoWStage(..),
   rounds, epochs,
   bytesInItem, wordsInItem,
   roomItems, roomsAt, itemsAt,
   hash, hashS
   ) where
 
-import Blockchain.ExtWord (Word512)
 import qualified Crypto.Hash.SHA3 as SHA3
 import Data.ByteString.Lazy (ByteString, fromStrict)
 import qualified Data.ByteString as Strict
@@ -16,7 +15,6 @@ import Math.NumberTheory.Primes.Testing (isPrime)
 import RAM
 
 type EthWord = Word32 -- jWordBytes = 4
-type CacheWord = Word512 -- bytesInItem Cache = 64 -> 512 bits
 
 type CacheB = RAM Strict.ByteString
 type CacheMinor = RAM Strict.ByteString
@@ -78,7 +76,7 @@ roomsEpoch stage = case stage of
   Mix     -> 0
   PoW     -> 0
   
-roomItems :: PoWStage -> Int
+roomItems :: PoWStage -> Integer
 roomItems stage = case stage of
   Cache   -> 1
   Dataset -> 2 -- bytesInItem Mix `div` bytesInItem Dataset
