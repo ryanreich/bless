@@ -1,0 +1,11 @@
+flags:
+packages:
+- '.'
+extra-deps:
+- arithmoi-0.4.1.3
+- mtl-2.2.1
+- transformers-0.4.3.0
+- loop-0.2.0
+- vector-binary-instances-0.2.1.0
+- vector-0.11.0.0
+resolver: ghc-7.8

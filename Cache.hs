@@ -1,39 +1,54 @@
-module Cache (makeCache) where
+module Cache where
+
+import Control.Loop
+import Control.Monad
+import Control.Monad.ST
 
 import Data.Bits (xor)
-import Data.ByteString (ByteString, head, zipWith, pack)
-import Data.List (genericReplicate)
 
-import Prelude hiding (head, zipWith)
-import qualified Data.List as List (head, zipWith, zipWith3)
-  
-import RAM
-import Types
-import Util
+import qualified Data.Vector as V hiding (Vector, MVector)
+import Data.Vector (Vector, MVector)
+import qualified Data.Vector.Mutable as MV hiding (STVector)
+import Data.Vector.Mutable (STVector)
+import qualified Data.Vector.Storable as UV
+import qualified Data.Vector.Storable.Mutable as UMV
+import qualified Data.Vector.Generic as VG
 
-makeCache :: Integer -> Cache
-makeCache when =
-  unpackCacheB $ iterate (eRMH when) (cacheInit when) !!! rounds Cache
+import Utils
 
-cacheInit :: Integer -> CacheB
-cacheInit when = asCache when $ tail $ iterate (hashS Cache) init
-  where
-    init =
-      let zero = pack $ genericReplicate (bytesInItem PoW) 0
-      in  iterate (hashS PoW) zero !!! (epochs when + 1)
+type CacheItem = UV.Vector EthWord
+type Cache = Vector CacheItem
 
-eRMH :: Integer -> CacheB -> CacheB
-eRMH when cache0 = cache
-  where
-    cache = asCache when $ List.zipWith3 eRMHit' [0..] cacheLPrev cacheL
-    cacheL = elems cache0
-    cacheLPrev = RAM.last cache0 : cacheL
-    eRMHit' = eRMHit . getter
-    getter n i
-      | n < 255 && i >= n = cache0 ! i
-      | otherwise = cache ! i
+makeCache :: Int -> CacheItem -> Cache
+makeCache epoch seed = runST $ do
+  cache <- V.unsafeThaw $ V.unsafeTail $
+           V.iterateN (1 + cacheItems epoch) (hash cacheItemBytes) seed
+  let cacheRound = forLoop 0 (< MV.length cache) (+1) $ \i -> do
+        prev <- MV.unsafeRead cache $ if i == 0 then MV.length cache - 1 else i - 1
+        curr <- MV.unsafeRead cache i
+        let hCurr = fromIntegral $ UV.unsafeHead curr
+        href <- MV.unsafeRead cache $ hCurr `rem` MV.length cache
+        MV.unsafeWrite cache i $ hash cacheItemBytes $ UV.zipWith xor prev href
+  replicateM_ cacheRounds cacheRound
+  V.unsafeFreeze cache  
 
-eRMHit :: (Integer -> ByteString) -> ByteString -> ByteString -> ByteString
-eRMHit getter prev curr =
-  hashS Cache $ pack $ zipWith xor prev item
-  where item = getter (fromIntegral $ head curr)
+nextCacheSeed :: CacheItem -> CacheItem
+nextCacheSeed seed = hash cacheSeedBytes seed
+
+initCacheSeed :: CacheItem
+initCacheSeed = UV.replicate cacheSeedBytes 0
+
+cacheSeedBytes :: Int
+cacheSeedBytes = 32
+
+cacheItemBytes :: Int
+cacheItemBytes = 64
+
+cacheRounds :: Int
+cacheRounds = 3
+
+cacheItems :: Int -> Int
+cacheItems = epochGrowth (2^24) (2^17) cacheItemBytes
+
+cacheItemWords :: Int
+cacheItemWords = fromIntegral $ cacheItemBytes `quot` 4
